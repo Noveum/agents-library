@@ -1,0 +1,25 @@
+# Core dependencies
+openai>=1.0.0
+anthropic>=0.20.0
+pyyaml>=6.0
+python-dotenv>=1.0.0
+
+# Optional dependencies for API mode
+fastapi>=0.100.0
+uvicorn>=0.20.0
+pydantic>=2.0.0
+
+# Optional dependencies for Noveum tracing
+# noveum-trace>=0.1.0  # Uncomment when available
+
+# Optional dependencies for advanced features
+# chromadb>=0.4.0      # For vector-based knowledge base search
+# sentence-transformers>=2.2.0  # For semantic search
+# pandas>=2.0.0        # For ticket analytics
+
+# Development dependencies (optional)
+pytest>=7.0.0
+pytest-asyncio>=0.20.0
+black>=23.0.0
+flake8>=6.0.0
+

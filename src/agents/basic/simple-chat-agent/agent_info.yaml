@@ -1,0 +1,98 @@
+# Agent Metadata for Simple Chat Agent
+agent_id: basic.simple_chat_agent
+name: Simple Chat Agent
+category: basic
+subcategory: ""
+description: A basic conversational AI agent that can chat with users using various LLM providers
+version: 1.0.0
+author: Noveum
+tags:
+  - chat
+  - conversation
+  - basic
+  - llm
+
+# Technical Configuration
+class_name: SimpleChatAgent
+config_class: ChatAgentConfig
+min_python_version: "3.8"
+
+# API Configuration
+endpoints:
+  - chat
+  - process
+
+input_schema:
+  message:
+    type: string
+    description: Input message for conversation
+    required: true
+  user_id:
+    type: string
+    description: User identifier for conversation tracking
+    default: "default"
+  config:
+    type: object
+    description: Configuration overrides for the agent
+    default: {}
+
+output_schema:
+  response:
+    type: string
+    description: Agent's conversational response
+  metadata:
+    type: object
+    description: Response metadata including conversation info
+    properties:
+      user_id:
+        type: string
+        description: User identifier
+      agent_name:
+        type: string
+        description: Name of the agent
+      timestamp:
+        type: string
+        description: Response timestamp
+
+# Features and Capabilities
+features:
+  - Multi-provider LLM support (OpenAI, Anthropic)
+  - Conversation memory with configurable limits
+  - Interactive and API modes
+  - Noveum tracing integration
+  - Error handling and logging
+
+# Usage Examples
+examples:
+  - name: Basic Chat
+    description: Simple conversation with the agent
+    request:
+      message: "Hello, how are you?"
+      user_id: "user123"
+    expected_response:
+      response: "Hello! I'm doing well, thank you for asking. How can I help you today?"
+
+  - name: Follow-up Question
+    description: Conversation with context
+    request:
+      message: "What did we talk about before?"
+      user_id: "user123"
+    expected_response:
+      response: "We just started our conversation where you asked how I was doing."
+
+# Configuration Options
+configuration:
+  required_env_vars:
+    - OPENAI_API_KEY  # or ANTHROPIC_API_KEY
+  optional_env_vars:
+    - LLM_PROVIDER
+    - LLM_MODEL
+    - LLM_TEMPERATURE
+    - MEMORY_MAX_MESSAGES
+    - NOVEUM_API_KEY
+
+# Status
+enabled: true
+production_ready: true
+test_coverage: 85
+

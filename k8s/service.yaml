@@ -1,0 +1,40 @@
+# Service for AI Agents Library API
+apiVersion: v1
+kind: Service
+metadata:
+  name: agents-api-service
+  namespace: agents-library
+  labels:
+    app: agents-api
+    component: service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: agents-api
+
+---
+# Headless service for StatefulSet (if needed)
+apiVersion: v1
+kind: Service
+metadata:
+  name: agents-api-headless
+  namespace: agents-library
+  labels:
+    app: agents-api
+    component: headless-service
+spec:
+  type: ClusterIP
+  clusterIP: None
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app: agents-api
+

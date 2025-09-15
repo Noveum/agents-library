@@ -1,0 +1,10 @@
+# Kubernetes namespace for AI Agents Library
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: agents-library
+  labels:
+    name: agents-library
+    app: ai-agents-library
+    version: v1.0.0
+

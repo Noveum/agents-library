@@ -1,0 +1,153 @@
+# Agent Metadata for Customer Support Helpdesk Agent
+agent_id: business.helpdesk_agent
+name: Customer Support Helpdesk Agent
+category: business
+subcategory: customer-support
+description: Specialized customer support agent with ticket management, escalation workflows, and knowledge base integration
+version: 1.0.0
+author: Noveum
+tags:
+  - customer-support
+  - helpdesk
+  - tickets
+  - business
+  - support
+
+# Technical Configuration
+class_name: CustomerSupportAgent
+config_class: SupportAgentConfig
+min_python_version: "3.8"
+
+# API Configuration
+endpoints:
+  - chat
+  - support
+  - process
+
+input_schema:
+  message:
+    type: string
+    description: Customer support request or inquiry
+    required: true
+  user_id:
+    type: string
+    description: Customer identifier for ticket tracking
+    default: "default"
+  config:
+    type: object
+    description: Configuration overrides for the support agent
+    default: {}
+
+output_schema:
+  response:
+    type: string
+    description: Support agent's response to the customer
+  metadata:
+    type: object
+    description: Support ticket and interaction metadata
+    properties:
+      ticket_id:
+        type: string
+        description: Generated support ticket ID
+      priority:
+        type: string
+        description: Ticket priority (low, medium, high, urgent)
+      category:
+        type: string
+        description: Ticket category (technical, billing, account, product, general)
+      sentiment:
+        type: string
+        description: Customer sentiment (positive, neutral, negative)
+      escalated:
+        type: boolean
+        description: Whether the ticket was escalated
+      knowledge_base_used:
+        type: boolean
+        description: Whether knowledge base articles were used
+
+# Features and Capabilities
+features:
+  - Automatic ticket creation and classification
+  - Priority and category assignment
+  - Customer sentiment analysis
+  - Smart escalation detection
+  - Knowledge base integration
+  - Customer history tracking
+  - Multi-channel support (chat, email, API)
+  - Noveum tracing integration
+
+# Usage Examples
+examples:
+  - name: Password Reset Request
+    description: Customer needs help resetting their password
+    request:
+      message: "I forgot my password and can't log in"
+      user_id: "CUST001"
+    expected_response:
+      response: "I'm sorry to hear you're having trouble logging in! I'd be happy to help you reset your password..."
+      metadata:
+        priority: "medium"
+        category: "technical"
+        escalated: false
+
+  - name: Billing Inquiry
+    description: Customer has a question about their bill
+    request:
+      message: "Why was I charged $50 this month?"
+      user_id: "CUST002"
+    expected_response:
+      response: "I understand you have a question about your recent charge..."
+      metadata:
+        priority: "medium"
+        category: "billing"
+        escalated: false
+
+  - name: Escalation Trigger
+    description: Customer requests to speak with a manager
+    request:
+      message: "This is unacceptable! I want to speak to your manager!"
+      user_id: "CUST003"
+    expected_response:
+      metadata:
+        priority: "high"
+        escalated: true
+
+# Configuration Options
+configuration:
+  required_env_vars:
+    - OPENAI_API_KEY  # or ANTHROPIC_API_KEY
+    - COMPANY_NAME
+  optional_env_vars:
+    - LLM_PROVIDER
+    - LLM_MODEL
+    - AGENT_NAME
+    - ESCALATION_KEYWORDS
+    - MEMORY_MAX_MESSAGES
+    - NOVEUM_API_KEY
+
+# Support-Specific Configuration
+support_config:
+  ticket_categories:
+    - technical
+    - billing
+    - account
+    - product
+    - general
+  priority_levels:
+    - low
+    - medium
+    - high
+    - urgent
+  escalation_triggers:
+    - manager
+    - supervisor
+    - escalate
+    - complaint
+    - legal
+    - lawsuit
+
+# Status
+enabled: true
+production_ready: true
+test_coverage: 75
+

@@ -1,0 +1,82 @@
+# Ingress for AI Agents Library API
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-api-ingress
+  namespace: agents-library
+  labels:
+    app: agents-api
+    component: ingress
+  annotations:
+    # Nginx ingress controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    
+    # CORS
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    
+    # Request size limit
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    
+    # Timeout settings
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    
+    # SSL certificate (if using cert-manager)
+    # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    
+spec:
+  # TLS configuration
+  tls:
+  - hosts:
+    - agents-api.yourdomain.com  # Replace with your domain
+    secretName: agents-api-tls
+  
+  rules:
+  - host: agents-api.yourdomain.com  # Replace with your domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: agents-api-service
+            port:
+              number: 80
+
+---
+# Alternative ingress for development/testing without TLS
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: agents-api-ingress-dev
+  namespace: agents-library
+  labels:
+    app: agents-api
+    component: ingress-dev
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/rate-limit: "50"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+spec:
+  rules:
+  - host: agents-api-dev.yourdomain.com  # Replace with your dev domain
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: agents-api-service
+            port:
+              number: 80
+

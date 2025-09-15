@@ -1,0 +1,47 @@
+# Simple Chat Agent Configuration
+# This file shows all available configuration options
+
+agent_name: "Friendly Assistant"
+max_response_tokens: 1000
+temperature: 0.7
+
+# Custom system prompt (optional)
+system_prompt: |
+  You are a friendly and helpful AI assistant. Your personality traits:
+  - Warm and conversational
+  - Clear and concise in explanations
+  - Encouraging and supportive
+  - Honest about limitations
+  
+  Guidelines:
+  - Keep responses focused and relevant
+  - Ask clarifying questions when needed
+  - Provide examples when helpful
+  - Be encouraging and positive
+
+# LLM Provider Configuration
+llm:
+  provider: openai
+  model: gpt-3.5-turbo
+  temperature: 0.7
+  max_tokens: 2000
+  timeout: 30
+  # api_key: will be loaded from environment variable
+  # api_base: https://api.openai.com/v1  # Optional custom base URL
+
+# Memory Configuration
+memory:
+  type: buffer
+  max_messages: 20
+  max_tokens: 4000
+  persist_to_file: false
+  # file_path: ./conversations.json  # Uncomment to enable persistence
+
+# Noveum Tracing Configuration
+noveum:
+  enabled: true
+  project: simple-chat-agent
+  environment: development
+  sample_rate: 1.0
+  # api_key: will be loaded from environment variable
+
