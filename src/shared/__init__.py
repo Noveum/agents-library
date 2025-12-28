@@ -4,18 +4,18 @@ Shared Components Package
 Reusable components for all agents including LLM clients, memory, and tracing.
 """
 
-from .llm_client import LLMClient, LLMConfig
-from .memory import Memory, MemoryConfig
-from .noveum_tracer import NoveumTracer, NoveumConfig
-from .config import BaseConfig
+from .llm_client import LLMClient
+from .memory import ConversationMemory
+from .noveum_tracer import NoveumTracer
+from .config import LLMConfig, MemoryConfig, NoveumConfig, ChatAgentConfig
 
 __all__ = [
     "LLMClient",
     "LLMConfig",
-    "Memory", 
     "MemoryConfig",
+    "ConversationMemory",
     "NoveumTracer",
     "NoveumConfig",
-    "BaseConfig"
+    "ChatAgentConfig",
 ]
 

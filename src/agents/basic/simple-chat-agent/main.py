@@ -18,13 +18,27 @@ import sys
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-# Add shared components to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'shared-components'))
+def _load_local_config():
+    import importlib.util
+    import sys
+    from pathlib import Path
 
-from config import ChatAgentConfig
-from llm_client import LLMClient
-from memory import ConversationMemory
-from noveum_tracer import NoveumTracer
+    config_path = Path(__file__).resolve().with_name("config.py")
+    spec = importlib.util.spec_from_file_location("simple_chat_local_config", config_path)
+    if not spec or not spec.loader:
+        raise ImportError(f"Unable to load SimpleChat config from {config_path}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_local_config = _load_local_config()
+ChatAgentConfig = _local_config.ChatAgentConfig
+
+from src.shared.llm_client import LLMClient
+from src.shared.memory import ConversationMemory
+from src.shared.noveum_tracer import NoveumTracer
 
 
 class SimpleChatAgent:
@@ -90,6 +104,15 @@ Guidelines:
             )
         else:
             return await self._process_message(message, user_id)
+
+    async def process(self, message: str, user_id: str = "default") -> str:
+        """
+        Process endpoint-compatible alias.
+
+        The API supports /process, and will fall back to chat() if missing,
+        but we implement it explicitly so health checks are clean.
+        """
+        return await self.chat(message, user_id)
     
     async def _process_message(self, message: str, user_id: str) -> str:
         """Internal message processing with error handling."""

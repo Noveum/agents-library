@@ -7,11 +7,7 @@ import yaml
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, List
 
-# Import shared config classes
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared-components'))
-
-from config import LLMConfig, MemoryConfig, NoveumConfig
+from src.shared.config import LLMConfig, MemoryConfig, NoveumConfig
 
 
 @dataclass
