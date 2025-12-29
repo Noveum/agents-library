@@ -28,5 +28,3 @@ See `getstarted.md`.
 - `NOVABOT_DOCS_JSON_PATH` (default: `NoveumDocsData/processed/docs.json`)
 - `NOVABOT_VECTORS_PATH` (default: `NoveumDocsData/index/vectors.npy`)
 - `NOVABOT_INDEX_METADATA_PATH` (default: `NoveumDocsData/index/metadata.json`)
-
-
