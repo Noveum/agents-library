@@ -26,7 +26,7 @@ class NovaBotConfig:
     # Noveum tracing (LangChain integration)
     noveum_enabled: bool = True
     noveum_api_key: Optional[str] = None
-    noveum_project: str = "novabot_v.1"
+    noveum_project: str = "NovaBot"
     noveum_environment: str = "dev-novabot"
 
     # LLM provider (answer generation) - supports OpenAI or Gemini
@@ -35,7 +35,7 @@ class NovaBotConfig:
     
     # Gemini (fallback if OpenAI not set)
     gemini_api_key: Optional[str] = None
-    gemini_model: str = "gemini-1.5-flash"
+    gemini_model: str = "gemini-2.5-flash"
 
     # OpenAI embeddings (for RAG retrieval)
     openai_embedding_model: str = "text-embedding-3-small"
@@ -80,7 +80,7 @@ class NovaBotConfig:
             agent_name=os.getenv("NOVABOT_NAME", "NovaBot"),
             noveum_enabled=os.getenv("NOVEUM_ENABLED", "true").lower() == "true",
             noveum_api_key=os.getenv("NOVEUM_API_KEY"),
-            noveum_project=os.getenv("NOVEUM_PROJECT", "novabot_v.1"),
+            noveum_project=os.getenv("NOVEUM_PROJECT", "NovaBot"),
             noveum_environment=os.getenv("NOVEUM_ENVIRONMENT", "dev-novabot"),
             openai_api_key=os.getenv("OPENAI_API_KEY"),
             openai_model=os.getenv("OPENAI_MODEL", "gpt-4o-mini"),

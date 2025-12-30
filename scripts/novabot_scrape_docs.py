@@ -18,6 +18,7 @@ import argparse
 import json
 import re
 import time
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Set, Tuple
@@ -111,7 +112,7 @@ def chunk_text(title: str, url: str, text: str, max_chars: int = 2500, overlap: 
                     "title": title,
                     "section_path": "",
                     "content": chunk,
-                    "content_hash": f"scrape-{hash(chunk)}",
+                    "content_hash": f"scrape-{hashlib.md5(chunk.encode()).hexdigest()[:12]}",
                 }
             )
             cid += 1

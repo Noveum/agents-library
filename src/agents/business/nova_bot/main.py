@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
 import time
 from dataclasses import dataclass
@@ -182,16 +183,25 @@ class NumpyVectorRetriever:
         top_idx = np.argsort(-scores)[:k]
 
         out: List[RetrievedChunk] = []
+        logger = logging.getLogger(__name__)
         for idx in top_idx:
-            d = self.docs[int(idx)]
+            idx_int = int(idx)
+            # Bounds check to prevent IndexError if docs and vector index are mismatched
+            if idx_int >= len(self.docs):
+                logger.warning(
+                    f"Index {idx_int} out of range for docs list (length {len(self.docs)}). "
+                    "Vector index and docs may be out of sync. Skipping this entry."
+                )
+                continue
+            d = self.docs[idx_int]
             out.append(
                 RetrievedChunk(
-                    chunk_id=str(d.get("chunk_id", idx)),
+                    chunk_id=str(d.get("chunk_id", idx_int)),
                     url=str(d.get("url", "")),
                     title=str(d.get("title", "")),
                     section_path=str(d.get("section_path", "")),
                     content=str(d.get("content", "")),
-                    score=float(scores[int(idx)]),
+                    score=float(scores[idx_int]),
                 )
             )
         return out
