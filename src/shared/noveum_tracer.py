@@ -26,6 +26,7 @@ class NoveumTracer:
         self.config = config
         self.enabled = config.enabled and config.api_key is not None
         self._client = None
+        self._active_traces: Dict[str, Any] = {}
         
         if self.enabled:
             self._initialize_client()
@@ -227,30 +228,56 @@ class NoveumTracer:
         """Start a new trace."""
         if self._client and hasattr(self._client, "start_trace"):
             try:
+                trace_id = trace_data.get("trace_id")
+                if not trace_id:
+                    print("⚠️  No trace_id in trace_data, cannot start trace")
+                    return
+                
                 # start_trace returns a ContextualTrace context manager; keep it for later end.
-                self._active_trace = self._client.start_trace(
+                ctx = self._client.start_trace(
                     name=trace_data.get("agent_name", "agent_interaction"),
                     metadata=trace_data,
                 )
                 # Enter it to set context
-                self._active_trace.__enter__()
+                ctx.__enter__()
+                # Store the context manager keyed by trace_id for concurrent trace support
+                self._active_traces[trace_id] = ctx
             except Exception as e:
                 print(f"⚠️  Failed to start trace: {e}")
     
     async def _end_trace(self, trace_id: str, result_data: Dict[str, Any]):
         """End a trace with results."""
         try:
-            active = getattr(self, "_active_trace", None)
+            # Pop the context manager from the dictionary to support concurrent traces
+            active = self._active_traces.pop(trace_id, None)
             if active is not None:
                 active.__exit__(None, None, None)
-                self._active_trace = None
         except Exception as e:
             print(f"⚠️  Failed to end trace: {e}")
     
     async def _log_event(self, event_data: Dict[str, Any]):
         """Log an event to Noveum."""
-        # Optional: SDK may expose trace_event APIs; keep as no-op if unavailable.
-        return
+        if not self.enabled:
+            return
+        
+        if self._client and hasattr(self._client, "log_event"):
+            try:
+                # Log event to Noveum SDK - will be associated with active trace context if available
+                result = self._client.log_event(event_data)
+                # Handle both sync and async SDK methods
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception as e:
+                print(f"⚠️  Failed to log event: {e}")
+        elif self._client and hasattr(self._client, "trace_event"):
+            # Fallback to trace_event if log_event is not available
+            try:
+                result = self._client.trace_event(event_data)
+                # Handle both sync and async SDK methods
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception as e:
+                print(f"⚠️  Failed to log event: {e}")
     
     def _estimate_tokens(self, messages: list) -> int:
         """Estimate token count for messages (rough approximation)."""

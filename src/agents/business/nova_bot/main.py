@@ -61,12 +61,12 @@ def _dedupe_keep_order(items: List[str]) -> List[str]:
     return out
 
 
-def _make_system_instruction() -> str:
+def _make_system_instruction(agent_name: str = "NovaBot") -> str:
     return (
-        "You are NovaPilot, a professional customer support assistant for Noveum, an observability and AI evaluation platform.\n\n"
+        f"You are {agent_name}, a professional customer support assistant for Noveum, an observability and AI evaluation platform.\n\n"
         
         "## Your Role and Identity\n"
-        "- Your name is NovaPilot (if asked, always identify yourself as NovaPilot)\n"
+        f"- Your name is {agent_name} (if asked, always identify yourself as {agent_name})\n"
         "- You are a knowledgeable, helpful, and friendly support assistant\n"
         "- You specialize in helping users understand Noveum's features, documentation, and best practices\n"
         "- Maintain a professional yet approachable tone\n\n"
@@ -405,7 +405,7 @@ class NovaBotAgent:
         from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
         from langchain_core.runnables import RunnableLambda, RunnablePassthrough
 
-        system_instruction = _make_system_instruction()
+        system_instruction = _make_system_instruction(self.agent_name)
 
         prompt = ChatPromptTemplate.from_messages(
             [

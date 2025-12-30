@@ -97,6 +97,10 @@ def main() -> int:
                 }
             )
 
+    if not vectors:
+        print("⚠️  No documents to process. Exiting without creating index.")
+        return 1
+
     mat = np.vstack(vectors)
     # Normalize to unit length for cosine similarity via dot product
     norms = np.linalg.norm(mat, axis=1, keepdims=True) + 1e-12
