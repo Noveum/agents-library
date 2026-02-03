@@ -1,0 +1,36 @@
+agent_id: business.nova_bot_simulator
+name: NovaBot Simulator
+category: business
+subcategory: testing
+description: "Automated testing agent that simulates user conversations to test NovaBot with normal and adversarial questions."
+version: "0.1.0"
+author: Noveum
+tags:
+  - noveum
+  - testing
+  - simulation
+  - automation
+class_name: NovaBotSimulatorAgent
+config_class: SimulatorConfig
+endpoints:
+  - run_simulation
+input_schema:
+  num_sessions:
+    type: integer
+    description: Number of sessions to simulate
+    default: 10
+  messages_per_session:
+    type: integer
+    description: Number of messages per session
+    default: 10
+  adversarial_ratio:
+    type: float
+    description: Ratio of adversarial questions (0.0-1.0)
+    default: 0.2
+output_schema:
+  results:
+    type: object
+    description: Complete simulation results with metrics and conversation logs
+min_python_version: "3.8"
+enabled: true
+

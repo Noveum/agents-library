@@ -37,6 +37,7 @@ class AgentRequest(BaseModel):
     message: str = Field(..., description="Input message for the agent")
     user_id: str = Field(default="api_user", description="User identifier")
     config_overrides: Optional[Dict[str, Any]] = Field(default=None, description="Configuration overrides")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
 
 
 class AgentResponse(BaseModel):
@@ -222,7 +223,13 @@ async def chat_with_agent(agent_id: str, request: AgentRequest):
             )
         
         # Invoke agent
-        response = await agent_instance.chat(request.message, request.user_id)
+        # Backwards compatible: only pass metadata if the agent accepts it.
+        try:
+            response = await agent_instance.chat(
+                request.message, request.user_id, request.metadata or {}
+            )
+        except TypeError:
+            response = await agent_instance.chat(request.message, request.user_id)
         
         processing_time = time.time() - start_time
         
@@ -252,6 +259,16 @@ async def chat_with_agent(agent_id: str, request: AgentRequest):
             success=False,
             error=error_msg
         )
+
+
+@app.post("/novabot/chat", response_model=AgentResponse)
+async def novabot_chat(request: AgentRequest):
+    """
+    Convenience endpoint for NovaBot.
+
+    Delegates to the registered agent: business.nova_bot
+    """
+    return await chat_with_agent("business.nova_bot", request)
 
 
 @app.post("/agents/{agent_id}/process", response_model=AgentResponse)

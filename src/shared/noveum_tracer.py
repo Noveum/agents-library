@@ -26,6 +26,7 @@ class NoveumTracer:
         self.config = config
         self.enabled = config.enabled and config.api_key is not None
         self._client = None
+        self._active_traces: Dict[str, Any] = {}
         
         if self.enabled:
             self._initialize_client()
@@ -35,15 +36,15 @@ class NoveumTracer:
     def _initialize_client(self):
         """Initialize Noveum client if available."""
         try:
-            # Try to import and initialize Noveum trace
             import noveum_trace
-            
-            self._client = noveum_trace.Client(
+            # SDK API (v1.x): noveum_trace.init(...) + context managers like start_trace()
+            noveum_trace.init(
                 api_key=self.config.api_key,
                 project=self.config.project,
-                environment=self.config.environment
+                environment=self.config.environment,
             )
-            
+
+            self._client = noveum_trace
             print(f"📊 Noveum tracing initialized for project: {self.config.project}")
             
         except ImportError:
@@ -225,25 +226,56 @@ class NoveumTracer:
     
     async def _start_trace(self, trace_data: Dict[str, Any]):
         """Start a new trace."""
-        if self._client and hasattr(self._client, 'start_trace'):
+        if self._client and hasattr(self._client, "start_trace"):
             try:
-                await self._client.start_trace(trace_data)
+                trace_id = trace_data.get("trace_id")
+                if not trace_id:
+                    print("⚠️  No trace_id in trace_data, cannot start trace")
+                    return
+                
+                # start_trace returns a ContextualTrace context manager; keep it for later end.
+                ctx = self._client.start_trace(
+                    name=trace_data.get("agent_name", "agent_interaction"),
+                    metadata=trace_data,
+                )
+                # Enter it to set context
+                ctx.__enter__()
+                # Store the context manager keyed by trace_id for concurrent trace support
+                self._active_traces[trace_id] = ctx
             except Exception as e:
                 print(f"⚠️  Failed to start trace: {e}")
     
     async def _end_trace(self, trace_id: str, result_data: Dict[str, Any]):
         """End a trace with results."""
-        if self._client and hasattr(self._client, 'end_trace'):
-            try:
-                await self._client.end_trace(trace_id, result_data)
-            except Exception as e:
-                print(f"⚠️  Failed to end trace: {e}")
+        try:
+            # Pop the context manager from the dictionary to support concurrent traces
+            active = self._active_traces.pop(trace_id, None)
+            if active is not None:
+                active.__exit__(None, None, None)
+        except Exception as e:
+            print(f"⚠️  Failed to end trace: {e}")
     
     async def _log_event(self, event_data: Dict[str, Any]):
         """Log an event to Noveum."""
-        if self._client and hasattr(self._client, 'log_event'):
+        if not self.enabled:
+            return
+        
+        if self._client and hasattr(self._client, "log_event"):
             try:
-                await self._client.log_event(event_data)
+                # Log event to Noveum SDK - will be associated with active trace context if available
+                result = self._client.log_event(event_data)
+                # Handle both sync and async SDK methods
+                if asyncio.iscoroutine(result):
+                    await result
+            except Exception as e:
+                print(f"⚠️  Failed to log event: {e}")
+        elif self._client and hasattr(self._client, "trace_event"):
+            # Fallback to trace_event if log_event is not available
+            try:
+                result = self._client.trace_event(event_data)
+                # Handle both sync and async SDK methods
+                if asyncio.iscoroutine(result):
+                    await result
             except Exception as e:
                 print(f"⚠️  Failed to log event: {e}")
     

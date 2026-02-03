@@ -27,13 +27,27 @@ from typing import List, Dict, Any, Optional, Tuple
 from datetime import datetime
 from enum import Enum
 
-# Add shared components to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'shared-components'))
+def _load_local_config():
+    import importlib.util
+    import sys
+    from pathlib import Path
 
-from config import SupportAgentConfig
-from llm_client import LLMClient
-from memory import ConversationMemory
-from noveum_tracer import NoveumTracer
+    config_path = Path(__file__).resolve().with_name("config.py")
+    spec = importlib.util.spec_from_file_location("helpdesk_local_config", config_path)
+    if not spec or not spec.loader:
+        raise ImportError(f"Unable to load Helpdesk config from {config_path}")
+    mod = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = mod
+    spec.loader.exec_module(mod)
+    return mod
+
+
+_local_config = _load_local_config()
+SupportAgentConfig = _local_config.SupportAgentConfig
+
+from src.shared.llm_client import LLMClient
+from src.shared.memory import ConversationMemory
+from src.shared.noveum_tracer import NoveumTracer
 
 
 class TicketPriority(Enum):
@@ -208,6 +222,22 @@ Remember: You represent {self.company_name} and should always maintain professio
             )
         else:
             return await self._process_support_request(content, customer_id, channel)
+
+    async def chat(self, message: str, user_id: str = "default") -> str:
+        """
+        Chat endpoint-compatible wrapper.
+
+        The underlying implementation returns structured ticket data; the API expects a string,
+        so we return only the user-facing response text.
+        """
+        result = await self.handle_support_request(message, user_id, channel="chat")
+        if isinstance(result, dict) and "response" in result:
+            return str(result["response"])
+        return str(result)
+
+    async def process(self, message: str, user_id: str = "default") -> str:
+        """Process endpoint-compatible alias."""
+        return await self.chat(message, user_id)
     
     async def _process_support_request(self, content: str, customer_id: str, channel: str = "chat") -> Dict[str, Any]:
         """Internal support request processing."""

@@ -308,18 +308,32 @@ class AgentRegistry:
         
         try:
             # Load the module
+            safe_mod_name = f"agent_{agent_id}".replace(".", "_")
             spec = importlib.util.spec_from_file_location(
-                f"agent_{agent_id}", 
+                safe_mod_name,
                 agent_info.module_path
             )
             module = importlib.util.module_from_spec(spec)
+            # Ensure the module is present in sys.modules for libraries (e.g. dataclasses on
+            # Python 3.12+) that expect `sys.modules[__module__]` to exist during import.
+            sys.modules[safe_mod_name] = module
             
-            # Add the agent directory to sys.path temporarily
+            # Add the agent directory to sys.path temporarily (avoid persistent pollution
+            # that can cause cross-agent import collisions like `import config`).
             agent_dir = Path(agent_info.module_path).parent
+            added = False
             if str(agent_dir) not in sys.path:
                 sys.path.insert(0, str(agent_dir))
-            
-            spec.loader.exec_module(module)
+                added = True
+            try:
+                spec.loader.exec_module(module)
+            finally:
+                if added:
+                    # Remove the first occurrence of agent_dir we inserted.
+                    try:
+                        sys.path.remove(str(agent_dir))
+                    except ValueError:
+                        pass
             
             self.loaded_modules[agent_id] = module
             return module
@@ -378,12 +392,35 @@ class AgentRegistry:
             if not agent:
                 return {"status": "error", "message": "Failed to create agent instance"}
             
-            # Check if agent has required methods
-            required_methods = ['chat', 'process'] if hasattr(agent, 'chat') else ['handle_support_request']
-            
-            for method in required_methods:
-                if not hasattr(agent, method):
-                    return {"status": "error", "message": f"Missing required method: {method}"}
+            # Check if agent has required methods.
+            # Be lenient when the API layer has fallbacks:
+            # - /process falls back to chat() if process() is missing
+            # - /support falls back to chat() if handle_support_request() is missing
+            endpoints = agent_info.endpoints or []
+
+            # If endpoints are not specified, use best-effort checks
+            if not endpoints:
+                if hasattr(agent, "chat") or hasattr(agent, "handle_support_request"):
+                    endpoints = ["chat"]
+
+            for ep in endpoints:
+                if ep == "chat":
+                    if not hasattr(agent, "chat"):
+                        return {"status": "error", "message": "Missing required method: chat"}
+                elif ep == "process":
+                    # process() optional if chat() exists (API fallback)
+                    if not (hasattr(agent, "process") or hasattr(agent, "chat")):
+                        return {
+                            "status": "error",
+                            "message": "Missing required method: process (or chat fallback)",
+                        }
+                elif ep == "support":
+                    # handle_support_request() optional if chat() exists (API fallback)
+                    if not (hasattr(agent, "handle_support_request") or hasattr(agent, "chat")):
+                        return {
+                            "status": "error",
+                            "message": "Missing required method: handle_support_request (or chat fallback)",
+                        }
             
             # Update health status
             agent_info.health_status = "healthy"
@@ -420,6 +457,40 @@ class AgentRegistry:
             "agents": {agent_id: asdict(info) for agent_id, info in self.agents.items()},
             "stats": self.get_registry_stats()
         }
+
+    async def check_agent_health(self, agent_id: str) -> Dict[str, Any]:
+        """
+        Async wrapper used by the FastAPI app.
+
+        Returns a dict with at least: status, message
+        """
+        result = self.health_check_agent(agent_id)
+        result["agent_id"] = agent_id
+        return result
+
+    async def get_agent_instance(self, agent_id: str, config_overrides: Dict[str, Any] = None):
+        """
+        Async wrapper used by the FastAPI app.
+
+        If config_overrides are provided, a fresh instance is created (not cached)
+        to avoid cross-request config contamination.
+        """
+        if config_overrides:
+            module = self.load_agent_module(agent_id)
+            agent_info = self.get_agent_info(agent_id)
+            if not module or not agent_info:
+                return None
+
+            agent_class = getattr(module, agent_info.class_name)
+            config_class = getattr(module, agent_info.config_class)
+
+            config = config_class.from_env()
+            for key, value in (config_overrides or {}).items():
+                if hasattr(config, key):
+                    setattr(config, key, value)
+            return agent_class(config)
+
+        return self.create_agent_instance(agent_id, config_overrides=None)
 
 
 # Global registry instance

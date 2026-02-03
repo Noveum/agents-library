@@ -1,0 +1,32 @@
+agent_id: business.nova_bot
+name: NovaBot
+category: business
+subcategory: customer_support
+description: "API-first customer support bot for Noveum docs with optional RAG."
+version: "0.1.0"
+author: Noveum
+tags:
+  - noveum
+  - docs
+  - support
+  - rag
+class_name: NovaBotAgent
+config_class: NovaBotConfig
+endpoints:
+  - chat
+input_schema:
+  message:
+    type: string
+    description: User question
+  user_id:
+    type: string
+    description: User identifier
+    default: api_user
+output_schema:
+  response:
+    type: string
+    description: Assistant response
+min_python_version: "3.8"
+enabled: true
+
+

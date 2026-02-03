@@ -1,0 +1,17 @@
+# NovaBot Simulator dependencies
+# The simulator directly imports NovaBotAgent, so it needs the same runtime deps
+
+# Core dependencies (same as NovaBot)
+google-generativeai>=0.8.0
+openai>=1.0.0
+numpy>=1.24.0
+
+# LangChain + Noveum tracing integration
+langchain-core>=0.3.0
+langchain-google-genai>=2.0.0
+langchain-openai>=0.3.0
+noveum-trace>=0.1.0
+
+# Standard library used by simulator
+# asyncio, json, random, re, time, pathlib - all built-in
+
