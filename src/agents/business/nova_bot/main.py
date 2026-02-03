@@ -219,6 +219,7 @@ class NovaBotAgent:
         self._sessions: Dict[str, List[Dict[str, str]]] = {}
         self._sessions_lock = asyncio.Lock()
         self._max_session_messages = 20  # keep last N messages per session
+        self._active_traces: Dict[str, str] = {}  # session_id -> trace_name
 
         # Noveum Trace (LangChain callback handler)
         self._noveum_callback = None
@@ -259,13 +260,19 @@ class NovaBotAgent:
 
         try:
             import noveum_trace
-            from noveum_trace import NoveumTraceCallbackHandler
+            from noveum_trace.integrations.langchain import NoveumTraceCallbackHandler
 
-            noveum_trace.init(
-                api_key=self.config.noveum_api_key,
-                project=self.config.noveum_project,
-                environment=self.config.noveum_environment,
-            )
+            init_kwargs = {
+                "api_key": self.config.noveum_api_key,
+                "project": self.config.noveum_project,
+                "environment": self.config.noveum_environment,
+            }
+            
+            # Add custom endpoint if configured
+            if self.config.noveum_endpoint:
+                init_kwargs["endpoint"] = self.config.noveum_endpoint
+            
+            noveum_trace.init(**init_kwargs)
 
             self._noveum_callback = NoveumTraceCallbackHandler()
         except Exception:
@@ -322,13 +329,28 @@ class NovaBotAgent:
         metadata = metadata or {}
         session_id = self._resolve_session_id(user_id=user_id, metadata=metadata)
         reset = bool(metadata.get("reset_session", False))
+        end_session = bool(metadata.get("end_session", False))
 
         if session_id and reset:
             async with self._sessions_lock:
                 self._sessions.pop(session_id, None)
+            if self._noveum_callback and session_id in self._active_traces:
+                try:
+                    self._noveum_callback.end_trace()
+                except Exception:
+                    pass
+                self._active_traces.pop(session_id, None)
 
         start = time.time()
         callbacks = [self._noveum_callback] if self._noveum_callback else None
+        if self._noveum_callback and session_id:
+            if session_id not in self._active_traces:
+                trace_name = f"novabot_session:{session_id}"
+                try:
+                    self._noveum_callback.start_trace(trace_name)
+                    self._active_traces[session_id] = trace_name
+                except Exception:
+                    pass
         result = await self._chain.ainvoke(
             {"question": message, "session_id": session_id},
             # Don't set a global run_name here: it can be inherited by child runs and make spans look identical.
@@ -349,6 +371,15 @@ class NovaBotAgent:
                 if len(hist) > self._max_session_messages:
                     hist = hist[-self._max_session_messages :]
                 self._sessions[session_id] = hist
+
+        # Optionally end session trace after response is generated
+        if self._noveum_callback and session_id and end_session:
+            if session_id in self._active_traces:
+                try:
+                    self._noveum_callback.end_trace()
+                except Exception:
+                    pass
+                self._active_traces.pop(session_id, None)
 
         return f"{answer}\n\n---\nmeta: rag={needs_rag}, chunks={retrieved_count}, latency_ms={latency_ms}"
 
@@ -395,15 +426,15 @@ class NovaBotAgent:
     def _build_chain(self):
         """
         LangChain runnable pipeline:
-        - gate: needs_rag
-        - retrieve (if available)
+        - router LLM decides tool call (rag.retrieve)
+        - retrieve if tool was called
         - prompt
         - LLM
         - finalize with sources
         """
         from langchain_core.output_parsers import StrOutputParser
         from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-        from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+        from langchain_core.runnables import RunnableBranch, RunnableLambda, RunnablePassthrough
 
         system_instruction = _make_system_instruction(self.agent_name)
 
@@ -431,6 +462,8 @@ Instructions:
         from langchain_core.tools import Tool
 
         async def _rag_retrieve_tool(question: str) -> Dict[str, Any]:
+            if self._embeddings is None:
+                return {"context": "", "sources": [], "chunks_retrieved": 0}
             retrieved: List[RetrievedChunk] = await self._retriever.aget_top_k(question)
             context, sources = _format_retrieved(retrieved)
             return {
@@ -440,39 +473,50 @@ Instructions:
             }
 
         rag_tool = Tool(
-            name="rag.retrieve",
+            name="rag_retrieve",
             description="Retrieve relevant chunks from Noveum docs (local vector index).",
             func=None,
             coroutine=_rag_retrieve_tool,
         )
 
-        async def prepare(inputs: Dict[str, Any], config: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-            q = str(inputs.get("question", "")).strip()
+        router_prompt = ChatPromptTemplate.from_messages(
+            [
+                (
+                    "system",
+                    "You decide if the user question needs Noveum documentation context. "
+                    "If it does, call the tool `rag_retrieve`. "
+                    "If it does not, respond with 'NO_TOOL'. Do not answer the question.",
+                ),
+                MessagesPlaceholder("chat_history"),
+                ("human", "Question: {question}"),
+            ]
+        )
+        router_llm = self._llm.bind_tools([rag_tool])
+        router_chain = router_prompt | router_llm
+
+        async def _get_history(inputs: Dict[str, Any]) -> List[Any]:
             session_id = str(inputs.get("session_id", "") or "")
-            needs_rag = self._needs_rag(q)
+            return await self._get_chat_history_messages(session_id)
 
-            context = ""
-            sources: List[str] = []
-            chunks_retrieved = 0
-            chat_history = await self._get_chat_history_messages(session_id)
+        def _needs_rag_from_router(inputs: Dict[str, Any]) -> bool:
+            msg = inputs.get("route_message")
+            tool_calls = getattr(msg, "tool_calls", None) or []
+            return bool(tool_calls)
 
-            if needs_rag and self._embeddings is not None:
-                try:
-                    tool_out = await rag_tool.ainvoke(q, config=config)
-                    context = str(tool_out.get("context", ""))
-                    sources = list(tool_out.get("sources", [])) or []
-                    chunks_retrieved = int(tool_out.get("chunks_retrieved", 0))
-                except Exception:
-                    context, sources, chunks_retrieved = "", [], 0
+        def _empty_retrieval(_: Dict[str, Any]) -> Dict[str, Any]:
+            return {"context": "", "sources": [], "chunks_retrieved": 0}
 
-            return {
-                "question": q,
-                "needs_rag": needs_rag,
-                "context": context,
-                "sources": sources,
-                "chunks_retrieved": chunks_retrieved,
-                "chat_history": chat_history,
-            }
+        def _extract_context(inputs: Dict[str, Any]) -> str:
+            retrieval = inputs.get("retrieval") or {}
+            return str(retrieval.get("context", ""))
+
+        def _extract_sources(inputs: Dict[str, Any]) -> List[str]:
+            retrieval = inputs.get("retrieval") or {}
+            return list(retrieval.get("sources", [])) or []
+
+        def _extract_chunks(inputs: Dict[str, Any]) -> int:
+            retrieval = inputs.get("retrieval") or {}
+            return int(retrieval.get("chunks_retrieved", 0))
 
         def finalize(d: Dict[str, Any]) -> Dict[str, Any]:
             answer = (d.get("answer") or "").strip() or "I couldn't generate a response. Please try again."
@@ -485,24 +529,30 @@ Instructions:
                 "chunks": int(d.get("chunks_retrieved", 0)),
             }
 
-        # Build the generation chain (prompt -> LLM -> parser)
-        # Let NoveumTraceCallbackHandler automatically name all spans based on component types
         generate = prompt | self._llm | StrOutputParser()
 
-        # Build the chain without any manual naming - let the callback handler automatically
-        # create spans with appropriate names based on component types (llm, tool, chain, etc.)
         chain = (
-            RunnableLambda(prepare)
+            RunnablePassthrough.assign(chat_history=RunnableLambda(_get_history))
+            | RunnablePassthrough.assign(route_message=router_chain)
+            | RunnablePassthrough.assign(needs_rag=RunnableLambda(_needs_rag_from_router))
+            | RunnablePassthrough.assign(
+                retrieval=RunnableBranch(
+                    (
+                        lambda x: bool(x.get("needs_rag")) and self._embeddings is not None,
+                        RunnableLambda(lambda x: str(x.get("question", ""))) | rag_tool,
+                    ),
+                    RunnableLambda(_empty_retrieval),
+                )
+            )
+            | RunnablePassthrough.assign(
+                context=RunnableLambda(_extract_context),
+                sources=RunnableLambda(_extract_sources),
+                chunks_retrieved=RunnableLambda(_extract_chunks),
+            )
             | RunnablePassthrough.assign(answer=generate)
             | RunnableLambda(finalize)
         )
 
-        # Return the chain without any manual naming configuration
-        # NoveumTraceCallbackHandler will automatically:
-        # - Name LLM calls based on their type (ChatOpenAI, ChatGoogleGenerativeAI, etc.)
-        # - Name tool calls based on tool name (rag.retrieve)
-        # - Name prompt templates appropriately
-        # - Create proper span hierarchy
         return chain
 
     def _needs_rag(self, question: str) -> bool:

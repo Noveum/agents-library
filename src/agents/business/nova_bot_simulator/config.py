@@ -7,10 +7,8 @@ and adds simulator-specific settings.
 
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 # Import NovaBotConfig to reuse its configuration
 def _load_novabot_config():
@@ -42,8 +40,8 @@ class SimulatorConfig:
     """Runtime configuration for NovaBot Simulator."""
 
     # Simulator-specific settings
-    num_sessions: int = 10
-    messages_per_session: int = 10
+    num_sessions: int = 100
+    messages_per_session: int = 3
     adversarial_ratio: float = 0.2  # 20% adversarial questions
     output_file: str = str(_repo_root() / "nova_bot_simulator_results.json")
     parallel: bool = True
@@ -54,25 +52,8 @@ class SimulatorConfig:
     # We'll create a NovaBotConfig instance from env vars
     @classmethod
     def from_env(cls) -> "SimulatorConfig":
-        """Load configuration from environment variables."""
-        return cls(
-            num_sessions=int(os.getenv("SIMULATOR_NUM_SESSIONS", "10")),
-            messages_per_session=int(os.getenv("SIMULATOR_MESSAGES_PER_SESSION", "10")),
-            adversarial_ratio=float(os.getenv("SIMULATOR_ADVERSARIAL_RATIO", "0.2")),
-            output_file=os.getenv(
-                "SIMULATOR_OUTPUT_FILE",
-                str(_repo_root() / "nova_bot_simulator_results.json"),
-            ),
-            parallel=os.getenv("SIMULATOR_PARALLEL", "true").lower() == "true",
-            metadata_json_path=os.getenv(
-                "SIMULATOR_METADATA_JSON_PATH",
-                str(_repo_root() / "NoveumDocsData" / "index" / "metadata.json"),
-            ),
-            docs_json_path=os.getenv(
-                "SIMULATOR_DOCS_JSON_PATH",
-                str(_repo_root() / "NoveumDocsData" / "processed" / "docs.json"),
-            ),
-        )
+        """Load configuration from local defaults."""
+        return cls()
 
     def get_novabot_config(self) -> NovaBotConfig:
         """Get NovaBotConfig instance from environment variables."""
