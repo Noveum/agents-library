@@ -450,6 +450,8 @@ Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ## Acknowledgments
 
+[Shashank Agarwal](https://www.linkedin.com/in/shashankagarwal2/) contributed the [initial agent templates and deployment examples](https://github.com/Noveum/agents-library/commit/d0fc05ac7abd624d50f5df52ef082a45906337f2).
+
 - Built with [FastAPI](https://fastapi.tiangolo.com/) for the API framework
 - Powered by [OpenAI](https://openai.com/) and [Anthropic](https://anthropic.com/) LLMs
 - Observability by [Noveum](https://noveum.ai)
